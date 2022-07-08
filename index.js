@@ -199,7 +199,8 @@ app.get("/offers", async (req, res) => {
       })
         .sort({ product_price: "ascending" })
         .select("product_name product_price -_id")),
-        res.json(offers);
+        console.log(offers);
+      res.json(offers);
     } else {
       res.status(400).json({ message: "Recherche inexistante" });
     }
