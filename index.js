@@ -164,6 +164,7 @@ app.post("/offer/publish", isAuthenticated, fileUpload(), async (req, res) => {
     await newOffer.save();
 
     res.json(newOffer);
+    alert("Offre publiée avec succès!");
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -173,47 +174,74 @@ app.post("/offer/publish", isAuthenticated, fileUpload(), async (req, res) => {
 
 app.get("/offers", async (req, res) => {
   try {
-    let offers;
-    //   product_name: new RegExp(req.query.title, "i"),
-    //   product_price: { $gte: req.query.priceMin, $lte: req.query.priceMax },
-    if (req.query.title) {
-      (offers = await Offer.find({
-        product_name: new RegExp(req.query.title, "i"),
-      })
-        .sort({ product_price: "ascending" })
-        .select("product_name product_price -_id")),
-        res.json(offers);
-    } else if (req.query.title && req.query.priceMin) {
-      (offers = await Offer.find({
-        product_name: new RegExp(req.query.title, "i"),
-        product_price: req.query.price,
-      })
-        .sort({ product_price: "ascending" })
-        .select("product_name product_price -_id")),
-        console.log(offers);
-      res.json(offers);
-    } else {
-      res.status(400).json({ message: "Recherche inexistante" });
-    }
+    const offers = await Offer.find();
+    res.status(200).json(offers);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 });
 
+// Route pour afficher une annonce en fonction de son id
+
+app.get("/offer/:id", async (req, res) => {
+  try {
+    const offer = await Offer.findById(req.params.id).populate({
+      path: "owner",
+      select: "account.username account.phone account.avatar",
+    });
+    res.json(offer);
+  } catch (error) {
+    console.log(error.message);
+    res.status(400).json({ message: error.message });
+  }
+});
+
+// app.get("/offers", async (req, res) => {
+//   try {
+//     let offers;
+//     //   product_name: new RegExp(req.query.title, "i"),
+//     //   product_price: { $gte: req.query.priceMin, $lte: req.query.priceMax },
+//     if (req.query.title) {
+//       (offers = await Offer.find({
+//         product_name: new RegExp(req.query.title, "i"),
+//       })
+//         .sort({ product_price: "ascending" })
+//         .select("product_name product_price -_id")),
+//         res.json(offers);
+//     } else if (req.query.title && req.query.priceMin) {
+//       (offers = await Offer.find({
+//         product_name: new RegExp(req.query.title, "i"),
+//         product_price: req.query.price,
+//       })
+//         .sort({ product_price: "ascending" })
+//         .select("product_name product_price -_id")),
+//         console.log(offers);
+//       res.json(offers);
+//     } else {
+//       res.status(400).json({ message: "Recherche inexistante" });
+//     }
+//   } catch (error) {
+//     res.status(400).json({ message: error.message });
+//   }
+// });
+
 // Route payment
 
 const stripe = createStripe(process.env.STRIPE_API_SECRET);
 
-app.post("/payment", async (req, res) => {
+app.post("/payment", isAuthenticated, async (req, res) => {
   console.log(req.body);
   try {
+    const stripeToken = req.body.stripeToken;
     let { status } = await stripe.charges.create({
       amount: (req.body.amount * 100).toFixed(0),
       currency: "eur",
       description: `Paiement vinted pour : ${req.body.title}`,
-      source: req.body.token,
+      source: stripeToken,
+      owner: req.user,
     });
-    res.json({ status });
+    res.status(200).json({ status });
+    console.log({ status });
   } catch (error) {
     console.log(error.message);
     res.status(400).json({ error: error.message });
