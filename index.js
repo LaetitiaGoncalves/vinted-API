@@ -7,9 +7,9 @@ const encBase64 = require("crypto-js/enc-base64");
 const uid2 = require("uid2");
 // const { appendFile } = require("fs");
 const fileUpload = require("express-fileupload");
-const cloudinary = require("cloudinary").v2; // On n'oublie pas le `.v2` à la fin
+const cloudinary = require("cloudinary").v2;
+const createStripe = require("stripe");
 
-// Données à remplacer avec les vôtres :
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.API_KEY,
@@ -31,7 +31,7 @@ const User = mongoose.model("User", {
   email: String,
   account: {
     username: String,
-    avatar: Object, // nous verrons plus tard comment uploader une image
+    avatar: Object,
   },
   newsletter: Boolean,
   token: String,
@@ -70,7 +70,7 @@ app.post("/user/signup", async (req, res) => {
           email: req.body.email,
           account: {
             username: req.body.username,
-            // avatar: req.body.avatar, nous verrons plus tard comment uploader une image
+            // avatar: req.body.avatar,
           },
           newsletter: req.body.newsletter,
           token: token,
@@ -119,17 +119,12 @@ app.post("/user/login", async (req, res) => {
 // Poster une annonce
 
 const isAuthenticated = async (req, res, next) => {
-  //   console.log(req.headers);
-  // Cette condition sert à vérifier si j'envoie un token
   if (req.headers.authorization) {
     const user = await User.findOne({
       token: req.headers.authorization.replace("Bearer ", ""),
     });
-    // Cette condition sert à vérifier si j'envoie un token valide !
 
     if (user) {
-      //Mon token est valide et je peux continuer
-      //J'envoie les infos sur mon user à la route /offer/publish
       req.user = user;
       next();
     } else {
@@ -156,20 +151,14 @@ app.post("/offer/publish", isAuthenticated, fileUpload(), async (req, res) => {
       owner: req.user,
     });
 
-    //J'envoie mon image sur cloudinary, juste après avoir crée en DB mon offre
-    // Comme ça j'ai accès à mon ID
     const result = await cloudinary.uploader.upload(
       convertToBase64(req.files.picture),
       {
         folder: "vinted/offers",
         public_id: `${req.body.title} - ${newOffer._id}`,
-        //Old WAY JS
-        // public_id: req.body.title + " " + newOffer._id,
       }
     );
 
-    // console.log(result);
-    //je viens rajouter l'image à mon offre
     newOffer.product_image = result;
 
     await newOffer.save();
@@ -179,6 +168,8 @@ app.post("/offer/publish", isAuthenticated, fileUpload(), async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
+
+// Afficher les annonces
 
 app.get("/offers", async (req, res) => {
   try {
@@ -206,6 +197,26 @@ app.get("/offers", async (req, res) => {
     }
   } catch (error) {
     res.status(400).json({ message: error.message });
+  }
+});
+
+// Route payment
+
+const stripe = createStripe(process.env.STRIPE_API_SECRET);
+
+app.post("/payment", async (req, res) => {
+  console.log(req.body);
+  try {
+    let { status } = await stripe.charges.create({
+      amount: (req.body.amount * 100).toFixed(0),
+      currency: "eur",
+      description: `Paiement vinted pour : ${req.body.title}`,
+      source: req.body.token,
+    });
+    res.json({ status });
+  } catch (error) {
+    console.log(error.message);
+    res.status(400).json({ error: error.message });
   }
 });
 
