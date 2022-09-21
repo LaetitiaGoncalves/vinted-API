@@ -136,6 +136,7 @@ const isAuthenticated = async (req, res, next) => {
 };
 
 app.post("/offer/publish", isAuthenticated, fileUpload(), async (req, res) => {
+  console.log(req.headers);
   try {
     const newOffer = new Offer({
       product_name: req.body.title,
@@ -162,9 +163,7 @@ app.post("/offer/publish", isAuthenticated, fileUpload(), async (req, res) => {
     newOffer.product_image = result;
 
     await newOffer.save();
-
     res.json(newOffer);
-    alert("Offre publiée avec succès!");
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -191,7 +190,6 @@ app.get("/offer/:id", async (req, res) => {
     });
     res.json(offer);
   } catch (error) {
-    console.log(error.message);
     res.status(400).json({ message: error.message });
   }
 });
@@ -229,8 +227,7 @@ app.get("/offer/:id", async (req, res) => {
 
 const stripe = createStripe(process.env.STRIPE_API_SECRET);
 
-app.post("/payment", isAuthenticated, async (req, res) => {
-  console.log(req.body);
+app.post("/payment", async (req, res) => {
   try {
     const stripeToken = req.body.stripeToken;
     let { status } = await stripe.charges.create({
@@ -238,10 +235,9 @@ app.post("/payment", isAuthenticated, async (req, res) => {
       currency: "eur",
       description: `Paiement vinted pour : ${req.body.title}`,
       source: stripeToken,
-      owner: req.user,
+      user: req.user,
     });
     res.status(200).json({ status });
-    console.log({ status });
   } catch (error) {
     console.log(error.message);
     res.status(400).json({ error: error.message });
