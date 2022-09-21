@@ -44,7 +44,9 @@ const Offer = mongoose.model("Offer", {
   product_description: String,
   product_price: Number,
   product_details: Array,
-  product_image: Object,
+  product_image: { type: mongoose.Schema.Types.Mixed, default: {} },
+  product_pictures: Array,
+  product_date: { type: Date, default: Date.now },
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -136,7 +138,6 @@ const isAuthenticated = async (req, res, next) => {
 };
 
 app.post("/offer/publish", isAuthenticated, fileUpload(), async (req, res) => {
-  console.log(req.headers);
   try {
     const newOffer = new Offer({
       product_name: req.body.title,
@@ -151,6 +152,7 @@ app.post("/offer/publish", isAuthenticated, fileUpload(), async (req, res) => {
       ],
       owner: req.user,
     });
+    console.log(req.headers);
 
     const result = await cloudinary.uploader.upload(
       convertToBase64(req.files.picture),
