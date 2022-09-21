@@ -55,7 +55,7 @@ const Offer = mongoose.model("Offer", {
 
 //Création d'un nouveau User
 
-app.post("/user/signup", async (req, res) => {
+app.post("/user/signup", fileUpload(), async (req, res) => {
   try {
     if (req.body.username === undefined) {
       res.status(400).json({ message: "Missing parameters" });
@@ -72,13 +72,22 @@ app.post("/user/signup", async (req, res) => {
           email: req.body.email,
           account: {
             username: req.body.username,
-            // avatar: req.body.avatar,
           },
           newsletter: req.body.newsletter,
           token: token,
           hash: hash,
           salt: salt,
         });
+
+        const resultImage = await cloudinary.uploader.upload(
+          convertToBase64(req.files.avatar),
+          {
+            folder: `vinted/users/${newUser._id}`,
+            public_id: "avatar",
+          }
+        );
+        newUser.account.avatar = resultImage;
+
         await newUser.save();
         res.json({
           _id: newUser._id,
@@ -175,7 +184,10 @@ app.post("/offer/publish", isAuthenticated, fileUpload(), async (req, res) => {
 
 app.get("/offers", async (req, res) => {
   try {
-    const offers = await Offer.find();
+    const offers = await Offer.find().populate({
+      path: "owner",
+      select: "account.username account.avatar",
+    });
     res.status(200).json(offers);
   } catch (error) {
     res.status(400).json({ message: error.message });
