@@ -44,8 +44,7 @@ const Offer = mongoose.model("Offer", {
   product_description: String,
   product_price: Number,
   product_details: Array,
-  product_image: { type: mongoose.Schema.Types.Mixed, default: {} },
-  product_pictures: Array,
+  product_image: Object,
   product_date: { type: Date, default: Date.now },
   owner: {
     type: mongoose.Schema.Types.ObjectId,
@@ -80,11 +79,10 @@ app.post("/user/signup", fileUpload(), async (req, res) => {
         });
 
         const resultImage = await cloudinary.uploader.upload(
-          convertToBase64(req.files.avatar),
-          {
+          convertToBase64(req.files.avatar, {
             folder: `vinted/users/${newUser._id}`,
             public_id: "avatar",
-          }
+          })
         );
         newUser.account.avatar = resultImage;
 
@@ -161,14 +159,12 @@ app.post("/offer/publish", isAuthenticated, fileUpload(), async (req, res) => {
       ],
       owner: req.user,
     });
-    console.log(req.headers);
 
     const result = await cloudinary.uploader.upload(
-      convertToBase64(req.files.picture),
-      {
+      convertToBase64(req.files.picture, {
         folder: "vinted/offers",
         public_id: `${req.body.title} - ${newOffer._id}`,
-      }
+      })
     );
 
     newOffer.product_image = result;
@@ -176,7 +172,27 @@ app.post("/offer/publish", isAuthenticated, fileUpload(), async (req, res) => {
     await newOffer.save();
     res.json(newOffer);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(400).json("route catch");
+  }
+});
+
+// Route supprimer une offre
+
+app.delete("/offer/delete/:id", isAuthenticated, async (req, res) => {
+  try {
+    await cloudinary.api.delete_resources_by_prefix(
+      `vinted/offers/${req.params.id}`
+    );
+    await cloudinary.api.delete_folder(`vinted/offers/${req.params.id}`);
+
+    offerDelete = await Offer.findById(req.params.id);
+
+    await offerDelete.delete();
+
+    res.status(200).json("Offer deleted");
+  } catch (error) {
+    console.log(error.message);
+    res.status(400).json({ error: error.message });
   }
 });
 
@@ -259,5 +275,5 @@ app.post("/payment", async (req, res) => {
 });
 
 app.listen(process.env.PORT, () => {
-  console.log("Server has started");
+  console.log("Server has started !");
 });
