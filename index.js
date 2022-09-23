@@ -5,7 +5,6 @@ const mongoose = require("mongoose");
 const SHA256 = require("crypto-js/sha256");
 const encBase64 = require("crypto-js/enc-base64");
 const uid2 = require("uid2");
-// const { appendFile } = require("fs");
 const fileUpload = require("express-fileupload");
 const cloudinary = require("cloudinary").v2;
 const createStripe = require("stripe");
@@ -178,20 +177,15 @@ app.post("/offer/publish", isAuthenticated, fileUpload(), async (req, res) => {
 
 // Route supprimer une offre
 
-app.delete("/offer/delete/:id", isAuthenticated, async (req, res) => {
+app.delete("/offer/delete/:id", async (req, res) => {
   try {
-    await cloudinary.api.delete_resources_by_prefix(
-      `vinted/offers/${req.params.id}`
-    );
-    await cloudinary.api.delete_folder(`vinted/offers/${req.params.id}`);
+    if (req.params.id) {
+      await cloudinary.uploader.destroy(`vinted/offers/${req.params.id}`);
+      await Offer.findByIdAndDelete(req.params.id);
 
-    offerDelete = await Offer.findById(req.params.id);
-
-    await offerDelete.delete();
-
-    res.status(200).json("Offer deleted");
+      res.status(200).json("Offer deleted");
+    }
   } catch (error) {
-    console.log(error.message);
     res.status(400).json({ error: error.message });
   }
 });
@@ -200,11 +194,17 @@ app.delete("/offer/delete/:id", isAuthenticated, async (req, res) => {
 
 app.get("/offers", async (req, res) => {
   try {
-    const offers = await Offer.find().populate({
+    let filters = {};
+
+    if (req.query.search) {
+      filters.product_name = new RegExp(req.query.search, "i");
+    }
+    const offers = await Offer.find(filters).populate({
       path: "owner",
       select: "account.username account.avatar",
     });
-    res.status(200).json(offers);
+
+    res.json(offers);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -223,35 +223,6 @@ app.get("/offer/:id", async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 });
-
-// app.get("/offers", async (req, res) => {
-//   try {
-//     let offers;
-//     //   product_name: new RegExp(req.query.title, "i"),
-//     //   product_price: { $gte: req.query.priceMin, $lte: req.query.priceMax },
-//     if (req.query.title) {
-//       (offers = await Offer.find({
-//         product_name: new RegExp(req.query.title, "i"),
-//       })
-//         .sort({ product_price: "ascending" })
-//         .select("product_name product_price -_id")),
-//         res.json(offers);
-//     } else if (req.query.title && req.query.priceMin) {
-//       (offers = await Offer.find({
-//         product_name: new RegExp(req.query.title, "i"),
-//         product_price: req.query.price,
-//       })
-//         .sort({ product_price: "ascending" })
-//         .select("product_name product_price -_id")),
-//         console.log(offers);
-//       res.json(offers);
-//     } else {
-//       res.status(400).json({ message: "Recherche inexistante" });
-//     }
-//   } catch (error) {
-//     res.status(400).json({ message: error.message });
-//   }
-// });
 
 // Route payment
 
